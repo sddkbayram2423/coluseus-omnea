@@ -38,6 +38,7 @@ export default Arena({
             // list of users and passwords
             users: {
               admin: "admin",
+              password:"admin135"
             },
             // sends WWW-Authenticate header, which will prompt the user to fill
             // credentials in
