@@ -59,7 +59,6 @@ export class OmneaRoom extends Room<OmneaRoomState> {
     });
 
     this.onMessage("new-client-joined-room", (client, roomDetail) => {
-      console.log("new-client-joined-room", roomDetail)
       if (!this.participants[roomDetail.roomName]) {
         const newRoom = {
           roomName: roomDetail.roomName,
