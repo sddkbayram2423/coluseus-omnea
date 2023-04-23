@@ -4,6 +4,11 @@ export class ChatRoom extends Room {
   // this room supports only 4 clients connected
   // maxClients = 30;
   participants = {
+    global: {
+      roomName: "global",
+      participants: [],
+    },
+
   };
   part = [];
 
@@ -27,20 +32,29 @@ export class ChatRoom extends Room {
       }
     });
 
+    this.onMessage("send-global-chat-message", (client, message) => {
+      this.broadcast("new-global-chat-message", message);
+    });
 
+    this.onMessage("public-chat-message", (client, message) => {
+      this.broadcast("new-public-chat-message", message);
+    });
 
-    // this.onMessage("public-chat-message", (client, message) => {
-    //   this.broadcast("new-public-chat-message", message);
-    // });
+    this.onMessage("private-chat-message", (client, message) => {
+      let receiver = this.clients.filter(
+        (cl) => message.receiverSocketId === cl.sessionId
+      );
 
-
+      if (receiver[0]) {
+        receiver[0].send("new-private-chat-message", message.message);
+      }
+    });
     this.onMessage("new-client-joined", (client, participant) => {
       this.part.push(participant);
       this.broadcast("new-client-joined", this.part);
     });
 
     this.onMessage("new-client-joined-room", (client, roomDetail) => {
-      console.log("new-client-joined-room", roomDetail)
       if (!this.participants[roomDetail.roomName]) {
         const newRoom = {
           roomName: roomDetail.roomName,
@@ -48,13 +62,18 @@ export class ChatRoom extends Room {
         };
         const newRooms = {};
         newRooms[roomDetail.roomName] = newRoom;
+
         this.participants = Object.assign({}, this.participants, newRooms);
+
       }
 
       if (this.participants[roomDetail.roomName]) {
 
         let participants = this.participants[roomDetail.roomName].participants;
         let isParticiantExist = participants.filter((item) => item.username === roomDetail.participant.username).length <= 0
+
+
+
         if (isParticiantExist) {
           this.participants[roomDetail.roomName].participants.push(
             roomDetail.participant
@@ -65,6 +84,18 @@ export class ChatRoom extends Room {
       this.broadcast("new-client-joined-room", this.participants);
     });
 
+    this.onMessage("new-client-joined-global-room", (client, participant) => {
+      if (
+        this.participants["global"].participants.filter((item) => item.username === participant.username).length <= 0
+      ) {
+        this.participants["global"].participants.push(participant);
+      }
+
+      this.broadcast(
+        "new-client-joined-global-room",
+        this.participants["global"].participants
+      );
+    });
   }
 
   onJoin(client) {
@@ -74,7 +105,12 @@ export class ChatRoom extends Room {
   async onLeave(client) {
 
     console.log({ client } + " Left room");
+
+   
     this.part = this.part.filter((par) => par.id !== client.sessionId);
+
+
+
     Object.keys(this.participants).flatMap(key => {
       let room = this.participants[key];
       let newParticpants = room.participants.filter((par) => par.sessionId !== client.sessionId);
@@ -82,7 +118,11 @@ export class ChatRoom extends Room {
       }
     );
 
+
     this.broadcast("client-left-room", this.participants);
+
+
+
     this.broadcast("new-client-joined", this.part);
     try {
       await this.allowReconnection(client, 60);

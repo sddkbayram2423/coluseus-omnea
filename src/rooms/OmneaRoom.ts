@@ -4,6 +4,9 @@ import { OmneaRoomState, Player } from "./schema/OmneaRoomState";
 export class OmneaRoom extends Room<OmneaRoomState> {
 
   maxClients = 30;
+  participants = {
+  };
+  part = [];
 
   onCreate(options: any) {
 
@@ -31,7 +34,54 @@ export class OmneaRoom extends Room<OmneaRoomState> {
       //console.debug(JSON.stringify(data));
     });
     this.onMessage("message", function (client, message) {
-      console.log(message);
+      // console.log(message);
+    });
+
+    this.onMessage("send-room-chat-message", (client, message) => {
+
+      if (this.participants[message.roomName]) {
+        let roomUsers = this.participants[message.roomName].participants;
+        roomUsers.forEach((user) => {
+          let receiver = this.clients.filter(
+            (cl) => cl.sessionId === user.sessionId
+          );
+
+          if (receiver[0]) {
+            receiver[0].send("new-room-chat-message", message.message);
+          }
+        });
+      }
+    });
+  
+    this.onMessage("new-client-joined", (client, participant) => {
+      this.part.push(participant);
+      this.broadcast("new-client-joined", this.part);
+    });
+
+    this.onMessage("new-client-joined-room", (client, roomDetail) => {
+      console.log("new-client-joined-room", roomDetail)
+      if (!this.participants[roomDetail.roomName]) {
+        const newRoom = {
+          roomName: roomDetail.roomName,
+          participants: [],
+        };
+        const newRooms = {};
+        newRooms[roomDetail.roomName] = newRoom;
+        this.participants = Object.assign({}, this.participants, newRooms);
+      }
+
+      if (this.participants[roomDetail.roomName]) {
+
+        let participants = this.participants[roomDetail.roomName].participants;
+        let isParticiantExist = participants.filter((item) => item.username === roomDetail.participant.username).length <= 0
+        if (isParticiantExist) {
+          this.participants[roomDetail.roomName].participants.push(
+            roomDetail.participant
+          );
+        }
+      }
+
+      this.broadcast("new-client-joined-room", this.participants);
     });
 
   }
@@ -66,9 +116,28 @@ export class OmneaRoom extends Room<OmneaRoomState> {
     console.log(client.sessionId, player.nickname, "joined!", this.roomId);
   }
 
-  onLeave(client: Client, consented: boolean) {
+  async onLeave(client: Client, consented: boolean) {
     this.state.players.delete(client.sessionId);
+
     console.log(client.sessionId, "left!");
+
+    this.part = this.part.filter((par) => par.id !== client.sessionId);
+    Object.keys(this.participants).flatMap(key => {
+      let room = this.participants[key];
+      let newParticpants = room.participants.filter((par) => par.sessionId !== client.sessionId);
+      this.participants[key].participants = newParticpants;
+      }
+    );
+
+    this.broadcast("client-left-room", this.participants);
+    try {
+      await this.allowReconnection(client, 60);
+      console.log("Reconnected!");
+
+      client.send("status", "Welcome back!");
+    } catch (e) {
+      console.log(e);
+    }
   }
 
   onDispose() {

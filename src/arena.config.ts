@@ -6,7 +6,7 @@ import basicAuth from "express-basic-auth";
  * Import your Room files
  */
 import { OmneaRoom } from "./rooms/OmneaRoom";
-import { ChatRoom } from "./rooms/ChatRoom";
+// import { ChatRoom } from "./rooms/ChatRoom";
 
 export default Arena({
     getId: () => "Your Colyseus App",
@@ -16,7 +16,7 @@ export default Arena({
          * Define your room handlers:
          */
          gameServer.define("omnea-rooms", OmneaRoom);
-         gameServer.define("chat-room", ChatRoom);
+        //  gameServer.define("chat-room", ChatRoom);
 
     },
 
